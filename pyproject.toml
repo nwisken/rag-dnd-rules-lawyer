@@ -1,0 +1,53 @@
+[project]
+name = "ruleslawyer"
+version = "0.1.0"
+description = "Rules Lawyer: a D&D 5e RAG assistant with hybrid retrieval, edition-aware answers, and evaluated retrieval quality."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "psycopg[binary]>=3.2",
+    "sentence-transformers>=3.0",
+    "streamlit>=1.38",
+    "httpx>=0.27",
+    "pydantic-settings>=2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ruleslawyer"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort (import ordering)
+    "UP",  # pyupgrade (modern syntax)
+    "B",   # bugbear (likely bugs)
+    "SIM", # simplify
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+mypy_path = "src"
+packages = ["ruleslawyer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

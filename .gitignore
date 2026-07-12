@@ -1,0 +1,22 @@
+# Environments & secrets
+.env
+.venv/
+
+# Data & experiment artifacts — never committed
+data/
+mlruns/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build
+dist/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
