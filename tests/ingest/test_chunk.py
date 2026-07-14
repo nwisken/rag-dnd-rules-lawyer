@@ -22,7 +22,8 @@ def make_chunk(
     return Chunk(
         content=content,
         heading_path=heading_path,
-        doc_section=doc_section,fixed test file for chunk and added adit        page_ref=page_ref,
+        doc_section=doc_section,
+        page_ref=page_ref,
         token_count=token_count,
     )
 
