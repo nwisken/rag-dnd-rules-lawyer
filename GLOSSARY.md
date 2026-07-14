@@ -15,6 +15,16 @@ similar meaning map to nearby points, even with no shared words. Retrieval becom
 not a knob: changing models means re-embedding the whole corpus *and* altering the
 `vector(384)` column.
 
+**Token / tokenizer** 🚩 — Embedding models don't read words or characters; they read
+*tokens*: pieces from a fixed vocabulary the model learned, often whole common words
+("attack") but sub-word fragments for rarer ones ("Fireball" → "Fire" + "ball").
+The tokenizer is the deterministic function that maps text to tokens. Rule of thumb:
+1 token ≈ ¾ of an English word. Tokens matter to us for exactly one reason: **models
+have a maximum input length in tokens** (512 for bge-small); text beyond it is
+silently truncated — invisible data loss. So tokens are our *unit of measurement* for
+chunk budgets. We never split text *on* tokens (that would cut mid-word); we split on
+meaning boundaries and *measure* the pieces in tokens.
+
 **Normalization** — Scaling a vector to length 1. Sentence-embedding models
 typically output normalized vectors, which makes cosine similarity and dot product
 give identical rankings.
@@ -73,9 +83,20 @@ beats pure vector on rules text, proven with eval numbers. 🚩
 scores 1/(k + rank) in each list, scores summed across lists. Uses only ranks, never
 raw scores, so it needs no score normalization between very different scorers. 🚩
 
+**Chunk** 🚩 — The atomic unit of retrieval: one contiguous piece of source text,
+sized to fit the embedding model's input limit, stored as one row in the `chunks`
+table with one embedding. When the retriever answers a query, what it returns is
+chunks. Too big → the vector is a mushy average of many topics and won't fit the
+model's 512-token limit; too small → a chunk lacks the context to be understood
+alone ("the target takes 8d6 fire damage" — of *what*?).
+
 **Chunking** — Splitting source documents into retrieval-sized pieces (~400 tokens,
 ~50 overlap here, heading-structure first). Chunk size/overlap are experiment
 parameters, justified by MLflow runs, never hardcoded on vibes.
+
+**Overlap** — Repeating the last ~50 tokens of one chunk at the start of the next, so
+a fact straddling the cut exists intact in at least one chunk and each chunk starts
+with enough context to make sense read alone. Cost: a little storage/duplication.
 
 **Contextual enrichment** — Prepending a chunk's `heading_path` (e.g.
 `Combat > Making an Attack > Sneak Attack`) to its text before embedding, so the
