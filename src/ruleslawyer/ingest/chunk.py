@@ -11,6 +11,12 @@ def split_sentences(paragraph: str) -> list[str]:
 
     Uses pysbd (rule-based, no model download) rather than
      a REGEX or similar methodology.
+
+    Args:
+        paragraph: the paragraph to split.
+
+    Returns:
+        The sentences in order, stripped, with empty ones dropped.
     """
     sentences: list[str] = _segmenter.segment(paragraph)
     return [sentence.strip() for sentence in sentences if sentence.strip()]
@@ -55,6 +61,10 @@ def overlap_tail(
         processed_text: paragraphs of the chunk that was just banked.
         count_tokens: function that returns the token count of a string.
         overlap_tokens: how many tokens of tail to carry into the next chunk.
+
+    Returns:
+        The tail paragraphs in their original order; always at least one
+        paragraph unless overlap_tokens <= 0.
     """
     if overlap_tokens <= 0:
         return []
@@ -82,6 +92,9 @@ def chunk_section(
         count_tokens: function that returns the token count of a string.
         max_tokens: max number of tokens allowed in a chunk.
         overlap_tokens: number of tokens to overlap between chunks.
+
+    Returns:
+        The section's chunks in order; empty if the section has no text.
     """
     raw_text = section.text.strip()
     if not raw_text:  # nothing to chunk
@@ -131,6 +144,9 @@ def chunk_sections(
         count_tokens: function that returns the token count of a string.
         max_tokens: max number of tokens allowed in a chunk.
         overlap_tokens: number of tokens to overlap between chunks.
+
+    Returns:
+        Every section's chunks, concatenated in section order.
     """
     chunks: list[Chunk] = []
     for section in sections:
