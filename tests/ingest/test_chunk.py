@@ -27,20 +27,20 @@ def make_chunk(
         token_count=token_count,
     )
 
-def test_chunking_with_empty_text():
+def test_chunking_with_empty_text() -> None:
     """checks chunking handles empty text correctly"""
     result = chunk_section(make_section(),count_words)
     assert result == [] # no chunks with no errors raised
 
 
-def test_fits_in_one_chunk():
+def test_fits_in_one_chunk() -> None:
     """checks a section under the budget comes back as a single chunk"""
     result = chunk_section(make_section(text="a short sentence here"), count_words)
     assert result == [make_chunk(content="a short sentence here", token_count=4)]
 
 
 
-def test_chunking_with_empy_heading_path():
+def test_chunking_with_empy_heading_path() -> None:
     """checks chunking handles empty headings correctly"""
     result = chunk_section(make_section(text="blah blah blah", heading_path=()), count_words)
     assert result == [
@@ -48,7 +48,7 @@ def test_chunking_with_empy_heading_path():
     ]
 
 
-def test_overlap_carried_into_next_chunk():
+def test_overlap_carried_into_next_chunk() -> None:
     """checks the tail of a full chunk is repeated at the start of the next one"""
     paragraphs = [
         "para one has five words",  # 5 tokens each, so 2 fit in a 12 token budget
@@ -68,7 +68,7 @@ def test_overlap_carried_into_next_chunk():
     ]
 
 
-def test_no_chunk_exceeds_max_tokens():
+def test_no_chunk_exceeds_max_tokens() -> None:
     """checks the token budget is never blown, even with overlap carried over"""
     paragraphs = [f"para {i} has five words" for i in range(10)]
     section = make_section(text="\n\n".join(paragraphs))
@@ -80,7 +80,7 @@ def test_no_chunk_exceeds_max_tokens():
         assert chunk.token_count <= 12
 
 
-def test_oversized_paragraph_is_split_into_sentences():
+def test_oversized_paragraph_is_split_into_sentences() -> None:
     """checks one huge paragraph is broken on sentence boundaries, not mid-sentence"""
     # one paragraph, three sentences, 6 tokens each. pysbd must not split on "30 ft."
     paragraph = (
@@ -99,7 +99,7 @@ def test_oversized_paragraph_is_split_into_sentences():
     assert result[2].content == "A hit deals eight fire damage."
 
 
-def test_chunk_sections_keeps_order_and_headings():
+def test_chunk_sections_keeps_order_and_headings() -> None:
     """checks chunk_sections chunks every section and preserves each heading path"""
     sections = [
         make_section(text="combat text here", heading_path=("Combat",)),
