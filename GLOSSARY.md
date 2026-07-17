@@ -29,6 +29,15 @@ meaning boundaries and *measure* the pieces in tokens.
 typically output normalized vectors, which makes cosine similarity and dot product
 give identical rankings.
 
+**Asymmetric embedding / query instruction** — Treating queries and documents
+differently at embed time. Short questions and long passages are different kinds of
+text and land in slightly different vector neighbourhoods; BGE models were trained so
+that prefixing a *query* (never a passage) with an instruction string ("Represent
+this sentence for searching relevant passages: ...") nudges its vector toward the
+passage region. For bge-*-v1.5 the authors call the gain small and optional, so this
+project ships Phase 1 symmetric (no prefix) and tests prefix-vs-no-prefix as a
+Phase 2 MLflow experiment.
+
 **Cosine similarity** — Similarity as the cosine of the angle between two vectors
 (1 = same direction, 0 = unrelated). Ignores magnitude, which for text embeddings is
 mostly noise; direction carries the semantics. pgvector operator: `<=>` (cosine
