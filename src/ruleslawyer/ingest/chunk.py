@@ -16,7 +16,7 @@ def split_sentences(paragraph: str) -> list[str]:
     return [sentence.strip() for sentence in sentences if sentence.strip()]
 
 
-def build_chunk(
+def add_chunk(
     chunks: list[Chunk],
     processed_text: list[str],
     section: Section,
@@ -106,7 +106,7 @@ def chunk_section(
     for paragraph in paragraphs:
         paragraph_tokens = count_tokens(paragraph)
         if current_tokens + paragraph_tokens > max_tokens:  # New chunk created
-            build_chunk(chunks, processed_text, section, count_tokens)
+            add_chunk(chunks, processed_text, section, count_tokens)
             # start the next chunk with the tail of the one just banked
             processed_text = overlap_tail(processed_text, count_tokens, overlap)
             current_tokens = count_tokens("\n\n".join(processed_text)) if processed_text else 0
@@ -114,7 +114,7 @@ def chunk_section(
         current_tokens += paragraph_tokens
 
     if processed_text:  # any text leftover not currently in a chunk
-        build_chunk(chunks, processed_text, section, count_tokens)
+        add_chunk(chunks, processed_text, section, count_tokens)
     return chunks
 
 
