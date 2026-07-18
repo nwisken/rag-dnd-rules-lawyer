@@ -113,6 +113,17 @@ vector carries context the bare chunk text lacks. Cheap and usually wins.
 
 ## Evaluation
 
+**W-shingling / n-gram containment** — Technique for asking "is document A's content
+present in document B?" without caring about ordering or formatting. Slide a window of
+n consecutive words (a *shingle*) over A; each shingle is a near-unique fingerprint of
+one specific sentence. Score = fraction of A's shingles found anywhere in B. Missing
+text ⇒ its shingles all vanish ⇒ score drops proportionally. n is a dial: too small
+(1–3) and common phrases match everywhere, inflating the score; too large (50) and
+one injected artifact (a page number mid-sentence) breaks every shingle spanning it,
+deflating it. ~8 is conventional. Used by plagiarism detectors and search-engine
+dedup; used here by `verify_corpus.py` to prove the markdown mirror contains the
+PDF's content before we chunk from it. 🚩
+
 **Golden set** — Hand-verified Q&A pairs (with grounding sections, edition and
 difficulty tags, plus deliberately unanswerable questions) that all retrieval and
 generation metrics are computed against. Lives in `evals/golden_set.jsonl`.
@@ -123,7 +134,24 @@ somewhere in the top k. 🚩
 
 **Faithfulness** — Generation metric: is every claim in the answer actually
 supported by the retrieved chunks? Guards against the model answering from its own
-training data instead of the sources. 🚩
+training data instead of the sources. Computed by a two-step LLM-as-judge pipeline
+(this is what RAGAS does): (1) a judge LLM decomposes the answer into atomic factual
+claims; (2) for each claim it answers "can this be inferred from the retrieved
+chunks alone?" — its own world knowledge doesn't count as evidence. Score =
+supported claims / total claims. An answer can be *correct* but *unfaithful* if the
+right fact never appeared in the retrieved chunks. Noisy run-to-run: judges split
+claims differently and waver on borderline inferences, so scores jitter a few
+points — which is why the CI gate has a tolerance. 🚩
+
+**Eval gate (tolerance + floor)** — The CI rule deciding whether a PR's eval scores
+pass. Two checks, both must hold: **tolerance** — the score may not drop more than
+0.05 below the tracked baseline (the best previous MLflow run); catches
+*regressions* while absorbing judge noise. **Floor** — the score must be ≥ 0.70 no
+matter what the baseline says; a fixed tripwire for "outright broken" (and covers
+the first run, when no baseline exists). A tolerance sized below the metric's
+natural noise makes CI flaky, and flaky gates get ignored — worse than loose ones.
+Both numbers are revisable once real eval runs exist, via a visible MLflow-justified
+change. 🚩
 
 **MLflow** — Experiment tracker. Every retrieval/prompt experiment is logged as a
 run with parameters, metrics, and git SHA, so "hybrid beats pure vector" is a
