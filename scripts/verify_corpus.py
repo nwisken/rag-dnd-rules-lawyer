@@ -7,7 +7,6 @@ from pathlib import Path
 from nltk.tokenize import wordpunct_tokenize
 from pypdf import PdfReader
 
-
 # Anchor sections that must be present in the corpus, one per major SRD 5.1 chapter.
 # Verified to occur in the PDF's normalized text (never derived from the markdown --
 # expectations taken from the file under test would prove nothing).
@@ -34,6 +33,11 @@ EXPECTED_SECTIONS = [
     "The Planes of Existence",
     "Nonplayer Characters",
 ]
+
+# Every anchor is a hand-verified chapter, so a missing one is a real failure:
+# no tolerance. Kept as a dial rather than inlined so the choice stays visible.
+SECTION_COVERAGE = 100
+CONTAINMENT_THRESHOLD = 0.8
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -100,4 +104,85 @@ def containment(reference: set[tuple[str, ...]], candidate: set[tuple[str, ...]]
     """
     same_text_length = len(candidate.intersection(reference))
     return same_text_length / len(reference)
+
+
+def missing_sections(markdown_text: str) -> list[str]:
+    """Check A: which EXPECTED_SECTIONS have no heading in the markdown.
+
+    Only heading lines count, a section name appearing in body prose is not
+    evidence that the section itself survived. Matching is substring-within-heading
+    rather than equality because some anchors sit under an "Appendix ..." prefix.
+
+    Args:
+        markdown_text: full text of the markdown corpus.
+
+    Returns:
+        list[str]: expected sections with no matching heading, empty if all present.
+    """
+    heading_lines = [line for line in markdown_text.splitlines() if line.startswith("#")]
+    return [
+        header
+        for header in EXPECTED_SECTIONS
+        if not any(header in line for line in heading_lines)
+    ]
+
+
+def corpus_containment(pdf_text: str, markdown_text: str) -> float:
+    """Check B: fraction of the PDF's 8-shingles that appear in the markdown.
+
+    Args
+        pdf_text: raw text extracted from the source PDF.
+        markdown_text: full text of the markdown corpus.
+
+    Returns:
+        float: containment score in [0, 1].
+    """
+    pdf_shingles = shingles(normalize(pdf_text))
+    markdown_shingles = shingles(normalize(markdown_text))
+
+    # containment divides by len(reference); guarantee a non-empty reference here,
+    # where the shingles are built, rather than inside the pure maths.
+    assert pdf_shingles, "No shingles extracted from the PDF -- unreadable?"
+
+    return containment(pdf_shingles, markdown_shingles)
+
+
+def is_corpus_valid(pdf_path: Path, markdown_path: Path) -> bool:
+    """Checks if the markdown file matches the contents of the PDF rules.
+
+    Args:
+        pdf_path: path to the source PDF.
+        markdown_path: path to the markdown file.
+
+    Returns:
+        bool: True if the markdown file matches the contents of the PDF rules.
+    """
+
+    pdf_file = extract_pdf_text(pdf_path)
+    markdown_file = markdown_path.read_text(encoding="utf-8")
+
+    # check A, That the expected Headers are inside the markdown file
+    missing = missing_sections(markdown_file)
+
+    count = len(EXPECTED_SECTIONS) - len(missing)
+    section_coverage = count / len(EXPECTED_SECTIONS) * 100
+    total = len(EXPECTED_SECTIONS)
+    print(f"Check A -- section coverage: {section_coverage:.1f}% ({count}/{total})")
+    if missing:
+        print(f"  missing sections: {', '.join(missing)}")
+    if section_coverage < SECTION_COVERAGE:
+        print("Section coverage % less than Threshold")
+        return False
+
+    # Check B, that the shingle containment meets the threshold
+    containment_value = corpus_containment(pdf_file, markdown_file)
+    print(f"Check B -- containment: {containment_value:.4f} (threshold {CONTAINMENT_THRESHOLD})")
+    if containment_value >= CONTAINMENT_THRESHOLD:
+        return True
+    else:
+        print("Containment less than Threshold")
+        return False
+
+
+
 
