@@ -8,6 +8,34 @@ from nltk.tokenize import wordpunct_tokenize
 from pypdf import PdfReader
 
 
+# Anchor sections that must be present in the corpus, one per major SRD 5.1 chapter.
+# Verified to occur in the PDF's normalized text (never derived from the markdown --
+# expectations taken from the file under test would prove nothing).
+EXPECTED_SECTIONS = [
+    "Races",
+    "Beyond 1st Level",
+    "Multiclassing",
+    "Backgrounds",
+    "Equipment",
+    "Feats",
+    "Using Ability Scores",
+    "The Environment",
+    "Between Adventures",
+    "The Order of Combat",
+    "Making an Attack",
+    "Damage and Healing",
+    "Spellcasting",
+    "Spell Lists",
+    "Spell Descriptions",
+    "Traps",
+    "Magic Items",
+    "Sentient Magic Items",
+    "Monsters",
+    "The Planes of Existence",
+    "Nonplayer Characters",
+]
+
+
 def extract_pdf_text(pdf_path: Path) -> str:
     """Extract the full text of a PDF as one string, pages joined by newlines.
 
