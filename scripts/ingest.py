@@ -20,7 +20,6 @@ def main() -> None:
     embedder = Embedder(model_name=DEFAULT_MODEL)
     conn = connect()
 
-
     for pdf_path, markdown_path, edition in CORPORA:
         if is_corpus_valid(pdf_path, markdown_path):
             print(f"Corpus: {markdown_path} is valid")

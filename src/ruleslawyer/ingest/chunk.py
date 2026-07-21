@@ -100,7 +100,12 @@ def chunk_section(
     if not raw_text:  # nothing to chunk
         return []
     
-    # split any paragraph that is too big to in a chunk into sentences
+    # Split any paragraph too big for a chunk into sentences.
+    # TODO: markdown tables use \n (not \n\n) between rows, so
+    # the whole table lands as one paragraph.  pysbd then mis-splits on
+    # abbreviations like "lb." instead of row boundaries, producing fragments
+    # that can still exceed max_tokens (and the 512-token embedding window
+    # of bge-small-en-v1.5).  Revisit in Phase 2 chunking experiments.
     paragraphs: list[str] = []
     raw_paragraphs = raw_text.split("\n\n")
     for raw_paragraph in raw_paragraphs:
