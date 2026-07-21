@@ -1,6 +1,12 @@
 """Tests the pure functions of the corpus verifier (no PDF/IO)."""
 
-from scripts.verify_corpus import containment, normalize, shingles
+from scripts.verify_corpus import (
+    EXPECTED_SECTIONS,
+    containment,
+    missing_sections,
+    normalize,
+    shingles,
+)
 
 
 def test_normalize_lowercases_strips_digits_and_flattens_ligatures() -> None:
@@ -46,3 +52,29 @@ def test_containment_measures_reference_survival_not_candidate() -> None:
     reference: set[tuple[str, ...]] = {("a", "b"), ("c", "d")}
     candidate: set[tuple[str, ...]] = {("a", "b"), ("x", "y"), ("z", "w")}
     assert containment(reference, candidate) == 0.5
+
+
+def test_missing_sections_empty_when_all_anchors_present() -> None:
+    """checks a corpus with every anchor as a top-level heading reports nothing missing."""
+    markdown = "\n".join(f"# {section}\n\nbody text\n" for section in EXPECTED_SECTIONS)
+    assert missing_sections(markdown) == []
+
+
+def test_missing_sections_ignores_deeper_headings() -> None:
+    """checks a sub-heading does not satisfy an anchor — the regression that let a
+    corpus missing the whole Equipment chapter pass, because '### Equipment' occurs
+    a dozen times inside Backgrounds."""
+    markdown = "# Races\n\n### Equipment\n\nstarting gear for this background\n"
+    assert "Equipment" in missing_sections(markdown)
+
+
+def test_missing_sections_ignores_body_prose() -> None:
+    """checks naming a section in a paragraph is not evidence the section survived."""
+    markdown = "# Races\n\nSee the Equipment chapter for starting gear.\n"
+    assert "Equipment" in missing_sections(markdown)
+
+
+def test_missing_sections_accepts_prefixed_headings() -> None:
+    """checks substring matching, so anchors living under an 'Appendix ...' title count."""
+    markdown = "# Appendix PH-C: The Planes of Existence\n"
+    assert "The Planes of Existence" not in missing_sections(markdown)
