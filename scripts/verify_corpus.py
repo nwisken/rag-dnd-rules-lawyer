@@ -37,7 +37,13 @@ EXPECTED_SECTIONS = [
 # Every anchor is a hand-verified chapter, so a missing one is a real failure:
 # no tolerance. Kept as a dial rather than inlined so the choice stays visible.
 SECTION_COVERAGE = 100
-CONTAINMENT_THRESHOLD = 0.8
+# Measured 0.8065 on the pinned SRD 5.1 pair (2026-07-21). The shortfall is PDF
+# extraction noise, not lost rules -- ~76% of unmatched shingles provably so, see
+# scripts/diagnose_corpus.py -- so 0.8065 is near the ceiling for a good corpus.
+# Pinned below it with margin for an extractor version bump, not for random variation:
+# both inputs are fixed, so the score is deterministic. This is a tripwire for a
+# swapped or re-pinned corpus. Revisable only with a fresh measurement.
+CONTAINMENT_THRESHOLD = 0.75
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -109,9 +115,11 @@ def containment(reference: set[tuple[str, ...]], candidate: set[tuple[str, ...]]
 def missing_sections(markdown_text: str) -> list[str]:
     """Check A: which EXPECTED_SECTIONS have no heading in the markdown.
 
-    Only heading lines count, a section name appearing in body prose is not
-    evidence that the section itself survived. Matching is substring-within-heading
-    rather than equality because some anchors sit under an "Appendix ..." prefix.
+    Only top-level ("# ") heading lines count. Body prose is not evidence that the
+    section survived, and neither are deeper headings: "### Equipment" occurs a dozen
+    times inside Backgrounds, so accepting any level let a corpus missing the whole
+    Equipment chapter pass. Matching is substring-within-heading rather than equality
+    because some anchors sit under an "Appendix ..." prefix.
 
     Args:
         markdown_text: full text of the markdown corpus.
@@ -119,7 +127,7 @@ def missing_sections(markdown_text: str) -> list[str]:
     Returns:
         list[str]: expected sections with no matching heading, empty if all present.
     """
-    heading_lines = [line for line in markdown_text.splitlines() if line.startswith("#")]
+    heading_lines = [line for line in markdown_text.splitlines() if line.startswith("# ")]
     return [
         header
         for header in EXPECTED_SECTIONS
