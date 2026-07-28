@@ -1,6 +1,9 @@
 """Streamlit app for users to ask and get responses to their D&D questions."""
 
+import httpx
 import streamlit as st
+
+API_URL = "http://localhost:8000/ask"
 
 EDITIONS: dict[str, str | None] = {
     "2014 (SRD 5.1)": "srd51",
@@ -14,5 +17,18 @@ st.caption("Answers grounded in the D&D 5e SRD (CC-BY-4.0, Wizards of the Coast)
 question = st.text_input("Enter your question")
 selected_edition = st.radio("Select Edition", list(EDITIONS), horizontal=True, index=2)
 
-st.write(question)
-st.write(f"Selected Edition: {selected_edition}")
+
+# if question, fire question to API
+if question:
+    payload = {"question": question, "edition": EDITIONS[selected_edition]}
+
+    try:
+        response = httpx.post(API_URL, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+    except httpx.RequestError:
+        st.error("Could not reach the API")
+    except httpx.HTTPStatusError as err:
+        st.error(f"The API returned an error ({err.response.status_code}).")
+    else:
+        st.write(data)
