@@ -12,7 +12,7 @@ from ruleslawyer.ingest.embed import Embedder
 @dataclass
 class SearchResult:
     content: str
-    score: float
+    cosine_distance: float
     edition: str
     doc_section: str
     heading_path: str
@@ -61,7 +61,7 @@ def search_vectors(
     return [
         SearchResult(
             content=row[0],
-            score=row[1],
+            cosine_distance=row[1],
             edition=row[2],
             doc_section=row[3],
             heading_path=row[4],

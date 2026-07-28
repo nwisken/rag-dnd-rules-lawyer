@@ -15,7 +15,7 @@ class AskRequest(BaseModel):
 class Source(BaseModel):
     edition: str
     heading_path: str
-    score: float
+    cosine_distance: float
 
 
 class AskResponse(BaseModel):

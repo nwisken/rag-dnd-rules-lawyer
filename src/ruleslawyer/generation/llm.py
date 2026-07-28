@@ -1,4 +1,5 @@
 """LLM client wrapping the Anthropic SDK for answer generation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,9 +9,7 @@ import anthropic
 from ruleslawyer.retrieval.search import SearchResult
 
 _PROMPT_TEMPLATE = (
-    Path(__file__).resolve().parent.parent.parent.parent
-    / "prompts"
-    / "answer_v1.md"
+    Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "answer_v1.md"
 ).read_text()
 
 
@@ -21,10 +20,7 @@ def _format_context(results: list[SearchResult]) -> str:
     blocks: list[str] = []
     for i, r in enumerate(results, 1):
         blocks.append(
-            f"[{i}]\n"
-            f"Edition: {r.edition}\n"
-            f"Section: {r.heading_path}\n"
-            f"Content: {r.content}"
+            f"[{i}]\nEdition: {r.edition}\nSection: {r.heading_path}\nContent: {r.content}"
         )
     return "\n\n".join(blocks)
 

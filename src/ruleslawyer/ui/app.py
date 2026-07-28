@@ -31,17 +31,17 @@ STUB_RESPONSE: dict[str, Any] = {
         {
             "edition": "srd51",
             "heading_path": "Classes > Rogue > Sneak Attack",
-            "score": 0.81,
+            "cosine_distance": 0.246,
         },
         {
             "edition": "srd51",
             "heading_path": "Equipment > Weapons > Weapon Properties",
-            "score": 0.74,
+            "cosine_distance": 0.254,
         },
         {
             "edition": "srd51",
             "heading_path": "Combat > Making an Attack > Ranged Attacks",
-            "score": 0.68,
+            "cosine_distance": 0.266,
         },
     ],
 }
@@ -56,7 +56,8 @@ def render_answer(data: dict[str, Any]) -> None:
     st.markdown(data["answer"])
     for source in data["sources"]:
         edition = EDITION_LABELS[source["edition"]]
-        st.markdown(f"- **{source['heading_path']}** — *{edition}* ({source['score']:.2f})")
+        distance = source["cosine_distance"]
+        st.markdown(f"- **{source['heading_path']}** — *{edition}* (distance {distance:.3f})")
 
 
 st.title("RAG D&D Lawyer")

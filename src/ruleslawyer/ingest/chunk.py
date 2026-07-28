@@ -1,4 +1,5 @@
 """Module for the chunking functions of text."""
+
 import pysbd
 
 from ruleslawyer.ingest.types import Chunk, Section, TokenCounter
@@ -99,7 +100,7 @@ def chunk_section(
     raw_text = section.text.strip()
     if not raw_text:  # nothing to chunk
         return []
-    
+
     # Split any paragraph too big for a chunk into sentences.
     # TODO: markdown tables use \n (not \n\n) between rows, so
     # the whole table lands as one paragraph.  pysbd then mis-splits on

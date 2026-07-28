@@ -25,7 +25,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Everything AFTER yield runs at shutdown
     conn.close()
 
+
 app = FastAPI(lifespan=lifespan)
+
 
 # FastAPI injects two parameters automatically:
 #   body: AskRequest  — parsed from the POST JSON body
@@ -45,7 +47,11 @@ def ask(body: AskRequest, request: Request) -> AskResponse:
     )
 
     sources = [
-        Source(edition=r.edition, heading_path=r.heading_path, score=r.score)
+        Source(
+            edition=r.edition,
+            heading_path=r.heading_path,
+            cosine_distance=r.cosine_distance,
+        )
         for r in results
     ]
 
