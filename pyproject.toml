@@ -17,6 +17,10 @@ dependencies = [
     "nltk>=3.10.0",
     "pypdf>=6.14.2",
     "anthropic>=0.117.1",
+    # Transitive dep of streamlit/starlette, pinned deliberately: on anyio 4.11+
+    # Streamlit's static-file route raises anyio.NoEventLoopError and every asset
+    # 500s, so the UI never loads. Revisit when Streamlit supports the newer anyio.
+    "anyio<4.11",
 ]
 
 [dependency-groups]
@@ -50,6 +54,7 @@ select = [
 
 [tool.mypy]
 strict = true
+plugins = ["pydantic.mypy"]
 python_version = "3.12"
 mypy_path = "src"
 packages = ["ruleslawyer"]

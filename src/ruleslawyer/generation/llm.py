@@ -5,8 +5,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import anthropic
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ruleslawyer.retrieval.search import SearchResult
+
+
+class Settings(BaseSettings):
+    """LLM credentials, read from the environment (or .env for local dev)."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    anthropic_api_key: str
+
 
 _PROMPT_TEMPLATE = (
     Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "answer_v1.md"
@@ -28,7 +38,9 @@ def _format_context(results: list[SearchResult]) -> str:
 class LLMClient:
     """Wraps the Anthropic Messages API behind a single generate call.
 
-    Construction creates the client (reads ANTHROPIC_API_KEY from env).
+    Construction creates the client, reading ANTHROPIC_API_KEY via Settings
+    (environment first, then .env) and passing it to the SDK explicitly —
+    the SDK only checks os.environ, which .env never populates.
     Model and max_tokens are per-instance config; query and results vary per call.
 
     Args:
@@ -39,7 +51,7 @@ class LLMClient:
     def __init__(self, model: str = "claude-haiku-4-5", max_tokens: int = 1024) -> None:
         self.model = model
         self.max_tokens = max_tokens
-        self.client = anthropic.Anthropic()
+        self.client = anthropic.Anthropic(api_key=Settings().anthropic_api_key)
 
     def generate(self, query: str, results: list[SearchResult]) -> str:
         """Send a query with retrieved context to the LLM and return the answer.
