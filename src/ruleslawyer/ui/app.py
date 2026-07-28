@@ -14,38 +14,6 @@ EDITIONS: dict[str, str | None] = {
 }
 EDITION_LABELS = {code: label for label, code in EDITIONS.items()}
 
-# TEMPORARY SCAFFOLD — delete once /ask has been seen working end to end.
-# Lets the rendering be built without a running API. The dict below matches
-# AskResponse in api/models.py field for field; the prose is placeholder text,
-# not SRD-verified rules content.
-USE_STUB = True
-
-STUB_RESPONSE: dict[str, Any] = {
-    "answer": (
-        "Placeholder answer body. It runs to a couple of sentences so the "
-        "rendering has something with **bold text** and real length to lay out.\n\n"
-        "**Sources:** [srd51 | Classes > Rogue > Sneak Attack], "
-        "[srd51 | Equipment > Weapons > Weapon Properties]"
-    ),
-    "sources": [
-        {
-            "edition": "srd51",
-            "heading_path": "Classes > Rogue > Sneak Attack",
-            "cosine_distance": 0.246,
-        },
-        {
-            "edition": "srd51",
-            "heading_path": "Equipment > Weapons > Weapon Properties",
-            "cosine_distance": 0.254,
-        },
-        {
-            "edition": "srd51",
-            "heading_path": "Combat > Making an Attack > Ranged Attacks",
-            "cosine_distance": 0.266,
-        },
-    ],
-}
-
 
 def render_answer(data: dict[str, Any]) -> None:
     """Renders one /ask response: the answer, then its retrieved sources.
@@ -69,18 +37,15 @@ selected_edition = st.radio("Select Edition", list(EDITIONS), horizontal=True, i
 
 # if question, fire question to API
 if question:
-    if USE_STUB:
-        render_answer(STUB_RESPONSE)
-    else:
-        payload = {"question": question, "edition": EDITIONS[selected_edition]}
+    payload = {"question": question, "edition": EDITIONS[selected_edition]}
 
-        try:
-            response = httpx.post(API_URL, json=payload, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-        except httpx.RequestError:
-            st.error("Could not reach the API")
-        except httpx.HTTPStatusError as err:
-            st.error(f"The API returned an error ({err.response.status_code}).")
-        else:
-            render_answer(data)
+    try:
+        response = httpx.post(API_URL, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+    except httpx.RequestError:
+        st.error("Could not reach the API")
+    except httpx.HTTPStatusError as err:
+        st.error(f"The API returned an error ({err.response.status_code}).")
+    else:
+        render_answer(data)
