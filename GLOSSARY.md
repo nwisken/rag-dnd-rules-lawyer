@@ -55,9 +55,13 @@ milliseconds, which is why Phase 1 deliberately has **no vector index**. 🚩
 loss of recall for a large speed-up. Only worth it when exact search is measurably
 too slow (large corpora and/or high query rates). 🚩
 
-**Recall / recall@k** — Of the true k nearest neighbours (or true grounding
-sections, in evals), the fraction the system actually returned. Exact search is
-recall 1.0; ANN indexes trade recall for speed via tunable parameters. 🚩
+**Recall / recall@k** — The fraction of the things that *should* have been returned
+that actually were. Careful: the word is used in two different places in this project.
+In *indexing*, "recall" means how many of the true nearest neighbours an ANN index
+found — exact search is recall 1.0 by definition, and ANN indexes trade recall away
+for speed. In *evaluation*, it means how many of a golden question's grounding
+sections appeared in the top k — see **fractional recall@k** under Evaluation. Same
+word, same shape, different denominators. 🚩
 
 **HNSW (Hierarchical Navigable Small World)** — The strongest general-purpose ANN
 index, and one of two in pgvector. Builds a layered graph of neighbour links: sparse
@@ -128,9 +132,55 @@ PDF's content before we chunk from it. 🚩
 difficulty tags, plus deliberately unanswerable questions) that all retrieval and
 generation metrics are computed against. Lives in `evals/golden_set.jsonl`.
 
+**Grounding section** — The place in the SRD that actually contains the answer to a
+golden-set question, recorded as a `heading_path` prefix (e.g.
+`Rogue > Class Features > Sneak Attack`). A retrieved chunk counts as relevant if its
+`heading_path` starts with one of them. A question may have several: "does Sneak
+Attack work with a thrown dagger?" needs both the Sneak Attack rule *and* the finesse
+definition under Weapon Properties, and retrieving only one of them is why v0.1
+refused to answer.
+
+**Label invariance** 🚩 — The rule that eval labels must not be expressed in terms of
+the thing you're experimenting on. Grounding is recorded as a heading path (a fact
+about the *document*) rather than as chunk UUIDs (a fact about the *index*), because
+every chunk-size experiment regenerates the UUIDs — labels tied to them would go stale
+on the first run and the "experiment" would be measuring label drift, not retrieval.
+The general form: name the target in the most stable vocabulary that still identifies
+it.
+
+**Fractional recall@k** — This project's retrieval metric: for one question,
+(grounding sections found in the top k) / (total grounding sections), then averaged
+over questions. Partial credit — finding 1 of 2 required sections scores 0.5, so the
+number moves as retrieval improves rather than flipping between 0 and 1.
+
+**Precision@k** — The mirror of recall: of the k results returned, what fraction were
+relevant. Recall asks "did we miss anything?", precision asks "how much junk came
+with it?". Precision@k is bounded by k, so with a fixed small k it mostly restates
+recall; recall + MRR is the more informative pair here. In a RAG pipeline low
+precision isn't free, though — irrelevant chunks eat context window and dilute the
+generator's attention.
+
+**Hit rate@k (the recall@k impostor)** 🚩 — Scores 1 if *any* grounding section is in
+the top k, else 0. Widely published under the name "recall@k", which is why it's worth
+being able to name the difference. It would have scored the v0.1 Sneak Attack failure
+a perfect 1.0 — the Sneak Attack chunk *was* retrieved — while the app refused to
+answer for want of the finesse definition. A metric that reports success on your
+motivating failure case is worse than no metric.
+
 **MRR (Mean Reciprocal Rank)** — Retrieval metric: 1/rank of the first relevant
-result, averaged over queries. Rewards putting a right answer *high*, not just
-somewhere in the top k. 🚩
+result, averaged over queries (rank 1 → 1.0, rank 2 → 0.5, nothing relevant → 0).
+Rewards putting a right answer *high*, not just somewhere in the top k. Complements
+recall rather than duplicating it: recall asks whether everything needed was found,
+MRR asks how near the top the first good hit landed. Only ever looks at the first
+relevant result, so on its own it's blind to multi-section questions. 🚩
+
+**MMR (Maximal Marginal Relevance)** — Not a metric and not a typo of MRR, despite
+the collision. It's a *selection* strategy for building a result list: pick each next
+result to maximise relevance to the query minus similarity to what's already picked,
+with a λ knob trading the two off. The problem it solves is a top-k of five
+near-identical chunks (which overlap-heavy chunking can cause) crowding out the one
+other section the answer needs. A Phase 5 candidate here, not something we currently
+run. 🚩
 
 **Faithfulness** — Generation metric: is every claim in the answer actually
 supported by the retrieved chunks? Guards against the model answering from its own
