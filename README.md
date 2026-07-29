@@ -15,6 +15,27 @@ Most RAG demos are a LangChain tutorial with a different PDF. This project diffe
    tracked in MLflow, and evals gating CI.
 4. **Actually deployed**: containerised, CI/CD to Azure Container Apps, monitored.
 
+## Example questions
+
+Drawn from the golden eval set (`evals/golden_set.jsonl`) — each one exercises a
+different part of the pipeline:
+
+- *"When do I provoke an opportunity attack?"* — **hybrid retrieval.** "Opportunity
+  attack" is a fixed piece of rules jargon, exactly the query shape where keyword
+  search beats embeddings and pure vector search drifts toward generically
+  combat-flavoured text.
+- *"Does Sneak Attack work with a thrown dagger?"* — **multi-section retrieval.** The
+  answer needs both the Sneak Attack rule and the definition of the *finesse* weapon
+  property; retrieving only one of them produces a refusal rather than an answer.
+- *"What's the save DC for a Fireball cast by a 5th-level wizard with 16 Intelligence?"*
+  — **multi-hop.** Three separate sections: the save DC formula, the wizard's
+  spellcasting ability, and the proficiency bonus for the character's level.
+- *"Compare grappling in the 2014 and 2024 rules."* — **edition-aware retrieval** via
+  metadata filtering. (Pending SRD 5.2 ingestion.)
+- *"How does the Lucky feat work?"* — **honest refusal.** The SRD has no Lucky feat,
+  but it does describe a halfling racial trait of the same name. Answering with the
+  trait is a wrong answer, not a refusal.
+
 ## Status
 
 🚧 Phase 1 (walking skeleton) in progress. Eval results table, screenshots, and the
