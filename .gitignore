@@ -5,6 +5,8 @@
 # Data & experiment artifacts — never committed
 data/
 mlruns/
+mlflow.db
+mlartifacts/
 
 # Python caches
 __pycache__/
