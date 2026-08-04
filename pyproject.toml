@@ -28,6 +28,8 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.6",
     "mypy>=1.11",
+    # experiment tracking only — the served app never opens a run, so it stays out of the image
+    "mlflow>=2.16",
 ]
 
 [build-system]
