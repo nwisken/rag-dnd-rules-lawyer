@@ -6,22 +6,10 @@ from typing import Any
 import psycopg
 
 from ruleslawyer.eval.golden_set import GoldenQuestion, load_golden_set
+from ruleslawyer.eval.metrics import is_grounded_by
 from ruleslawyer.ingest.load import connect
 
 GOLDEN_SET_PATH = Path("evals/golden_set.jsonl")
-
-
-def is_grounded_by(heading_path: str, grounding: str) -> bool:
-    """Tests whether a heading path sits at or below a grounding path in the tree.
-
-    Args:
-        heading_path: a chunk's full heading path, e.g "Cover > Half Cover".
-        grounding: a grounding path from the golden set, e.g "Cover".
-
-    Returns:
-        True if heading_path is the grounding section or one nested under it.
-    """
-    return heading_path == grounding or heading_path.startswith(grounding + " > ")
 
 
 def fetch_heading_paths(conn: psycopg.Connection[Any]) -> set[str]:

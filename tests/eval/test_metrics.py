@@ -1,6 +1,6 @@
-"""Tests the pure prefix matching of the grounding path checker (no database)."""
+"""Tests the pure retrieval metrics over heading paths (no database)."""
 
-from scripts.check_grounding_paths import is_grounded_by
+from ruleslawyer.eval.metrics import is_grounded_by
 
 
 def test_exact_path_is_grounded() -> None:
