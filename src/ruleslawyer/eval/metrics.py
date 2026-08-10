@@ -42,3 +42,27 @@ def recall_at_k(retrieved_paths: Sequence[str], grounding: Sequence[str], k: int
             found += 1
 
     return found / len(grounding)
+
+
+def reciprocal_rank(retrieved_paths: Sequence[str], grounding: Sequence[str]) -> float:
+    """Scores how high the first grounded result sits, as 1 / its rank.
+
+    Args:
+        retrieved_paths: heading paths of the retrieved chunks, best match first.
+        grounding: the grounding paths for one golden-set question.
+
+    Returns:
+        Reciprocal of the 1-based rank of the first grounded path, 0.0 if none hit.
+
+    Raises:
+        ValueError: if grounding is empty, i.e an unanswerable question slipped through.
+    """
+    if not grounding:
+        raise ValueError("reciprocal_rank needs at least one grounding path")
+
+    # enumerate from 1 so the top result scores 1/1, not 1/0
+    for rank, path in enumerate(retrieved_paths, start=1):
+        if any(is_grounded_by(path, g) for g in grounding):
+            return 1 / rank
+
+    return 0.0
