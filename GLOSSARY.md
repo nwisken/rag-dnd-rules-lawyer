@@ -88,6 +88,18 @@ and metadata filters — the reason we don't run a dedicated vector database. �
 is generated automatically from `content` so it can never drift out of sync. Matters
 here because rules jargon ("bonus action") is exactly what keyword search is good at.
 
+**`ts_rank`** — Postgres function that scores how well a document matches a
+full-text query by counting matching terms and weighting by frequency. Higher =
+more relevant. Simple and fast, but treats terms independently — "bonus" and
+"action" each contribute score whether they appear together or pages apart.
+
+**`ts_rank_cd`** (cover density) — Like `ts_rank`, but also rewards matching
+terms appearing *close together*. Internally it measures the width of the
+tightest "cover" (the smallest span of text containing all query terms) and
+scores inversely to that width. For multi-word rules queries like "sneak attack
+thrown dagger", this consistently outranks passages where the terms are scattered.
+The cost difference from `ts_rank` is negligible. This project uses `ts_rank_cd`.
+
 **Hybrid retrieval** — Running vector search *and* keyword search for the same
 query, then merging the two ranked lists. The project's core claim is that hybrid
 beats pure vector on rules text, proven with eval numbers. 🚩
