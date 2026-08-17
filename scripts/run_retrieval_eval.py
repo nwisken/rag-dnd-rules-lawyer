@@ -3,6 +3,7 @@
 Usage:
     uv run python scripts/run_retrieval_eval.py           # vector (default)
     uv run python scripts/run_retrieval_eval.py fulltext  # keyword only
+    uv run python scripts/run_retrieval_eval.py hybrid    # RRF fusion
 """
 
 import sys
@@ -16,6 +17,7 @@ from ruleslawyer.eval.metrics import recall_at_k, reciprocal_rank
 from ruleslawyer.eval.tracking import RunConfig, log_run
 from ruleslawyer.ingest.embed import DEFAULT_MODEL, Embedder
 from ruleslawyer.ingest.load import connect
+from ruleslawyer.retrieval.fusion import reciprocal_rank_fusion
 from ruleslawyer.retrieval.search import search_text, search_vectors
 
 GOLDEN_SET_PATH = Path("evals/golden_set.jsonl")
@@ -93,6 +95,28 @@ def retrieved_paths_for_text(
     return [result.heading_path for result in results]
 
 
+def retrieved_paths_for_hybrid(
+    question: GoldenQuestion,
+    embedder: Embedder,
+    conn: psycopg.Connection[Any],
+    top_k: int,
+) -> list[str]:
+    """Runs both searches, fuses with RRF, returns the top-k heading paths.
+
+    Args:
+        question: the golden question to search for.
+        embedder: the process-wide Embedder.
+        conn: open psycopg connection.
+        top_k: how many results to retrieve from each searcher before fusing.
+
+    Returns:
+        The heading paths from the fused ranking, best first, trimmed to top_k.
+    """
+    vector_paths = retrieved_paths_for(question, embedder, conn, top_k)
+    text_paths = retrieved_paths_for_text(question, conn, top_k)
+    return reciprocal_rank_fusion(vector_paths, text_paths)[:top_k]
+
+
 def main(mode: str = "vector") -> None:
     """Scores retrieval over the answerable golden set and logs it to MLflow."""
     answerable = [q for q in load_golden_set(GOLDEN_SET_PATH) if q.answerable]
@@ -103,8 +127,11 @@ def main(mode: str = "vector") -> None:
         retrieved = [retrieved_paths_for(q, embedder, conn, TOP_K) for q in answerable]
     elif mode == "fulltext":
         retrieved = [retrieved_paths_for_text(q, conn, TOP_K) for q in answerable]
+    elif mode == "hybrid":
+        embedder = Embedder()
+        retrieved = [retrieved_paths_for_hybrid(q, embedder, conn, TOP_K) for q in answerable]
     else:
-        print(f"unknown mode: {mode!r} (expected 'vector' or 'fulltext')")
+        print(f"unknown mode: {mode!r} (expected 'vector', 'fulltext', or 'hybrid')")
         sys.exit(1)
 
     metrics = evaluate(answerable, retrieved, TOP_K)
