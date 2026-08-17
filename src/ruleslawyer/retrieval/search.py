@@ -69,3 +69,49 @@ def search_vectors(
         )
         for row in rows
     ]
+
+def search_text(
+    query: str, conn: psycopg.Connection[Any], edition: str | None = None, top_k: int = 5
+) -> list[SearchResult]:
+    """Search query and return the top-k closest chunks by ts_rank_cd using matching keywords.
+
+    Args:
+        query: natural-language question from the user.
+        conn: open psycopg connection
+        edition: if set, only search this edition ('srd51' or 'srd52').
+        top_k: how many results to return.
+
+    Returns:
+        Results ordered by descending ts_rank_cd score (best match first).
+    """
+
+    sql = """SELECT content, ts_rank_cd(content_tsv, plainto_tsquery('english', %s)) AS score,
+    edition, doc_section, heading_path, page_ref
+    FROM chunks
+    WHERE content_tsv @@ plainto_tsquery('english', %s)
+ """
+
+    params: list[Any] = [query, query]
+
+    if edition is not None:
+        sql += " AND edition = %s"
+        params.append(edition)
+
+    sql += " ORDER BY score DESC LIMIT %s"
+    params.append(top_k)
+
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    return [
+        SearchResult(
+            content=row[0],
+            score=row[1],
+            edition=row[2],
+            doc_section=row[3],
+            heading_path=row[4],
+            page_ref=row[5],
+        )
+        for row in rows
+    ]
