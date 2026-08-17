@@ -1,4 +1,4 @@
-"""Naive vector search over the chunks table."""
+"""Retrieval functions over the chunks table."""
 
 from dataclasses import dataclass
 from typing import Any
@@ -12,7 +12,7 @@ from ruleslawyer.ingest.embed import Embedder
 @dataclass
 class SearchResult:
     content: str
-    cosine_distance: float
+    score: float
     edition: str
     doc_section: str
     heading_path: str
@@ -61,7 +61,7 @@ def search_vectors(
     return [
         SearchResult(
             content=row[0],
-            cosine_distance=row[1],
+            score=1 - row[1],
             edition=row[2],
             doc_section=row[3],
             heading_path=row[4],

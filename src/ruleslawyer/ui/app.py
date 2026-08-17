@@ -24,8 +24,8 @@ def render_answer(data: dict[str, Any]) -> None:
     st.markdown(data["answer"])
     for source in data["sources"]:
         edition = EDITION_LABELS[source["edition"]]
-        distance = source["cosine_distance"]
-        st.markdown(f"- **{source['heading_path']}** — *{edition}* (distance {distance:.3f})")
+        score = source["score"]
+        st.markdown(f"- **{source['heading_path']}** — *{edition}* (score {score:.3f})")
 
 
 st.title("RAG D&D Lawyer")

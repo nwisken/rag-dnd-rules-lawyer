@@ -50,7 +50,7 @@ def ask(body: AskRequest, request: Request) -> AskResponse:
         Source(
             edition=r.edition,
             heading_path=r.heading_path,
-            cosine_distance=r.cosine_distance,
+            score=r.score,
         )
         for r in results
     ]
