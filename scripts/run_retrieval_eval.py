@@ -1,5 +1,11 @@
-"""Scores vector-only retrieval over the answerable golden set and logs one MLflow run."""
+"""Scores retrieval over the answerable golden set and logs one MLflow run.
 
+Usage:
+    uv run python scripts/run_retrieval_eval.py           # vector (default)
+    uv run python scripts/run_retrieval_eval.py fulltext  # keyword only
+"""
+
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +16,7 @@ from ruleslawyer.eval.metrics import recall_at_k, reciprocal_rank
 from ruleslawyer.eval.tracking import RunConfig, log_run
 from ruleslawyer.ingest.embed import DEFAULT_MODEL, Embedder
 from ruleslawyer.ingest.load import connect
-from ruleslawyer.retrieval.search import search_vectors
+from ruleslawyer.retrieval.search import search_text, search_vectors
 
 GOLDEN_SET_PATH = Path("evals/golden_set.jsonl")
 EXPERIMENT = "retrieval-baseline"
@@ -68,13 +74,39 @@ def retrieved_paths_for(
     return [result.heading_path for result in results]
 
 
-def main() -> None:
-    """Scores the vector-only baseline over the answerable golden set and logs it to MLflow."""
+def retrieved_paths_for_text(
+    question: GoldenQuestion,
+    conn: psycopg.Connection[Any],
+    top_k: int,
+) -> list[str]:
+    """Runs one question through full-text search and returns its heading paths, best first.
+
+    Args:
+        question: the golden question to search for.
+        conn: open psycopg connection.
+        top_k: how many results to retrieve.
+
+    Returns:
+        The heading path of each retrieved chunk, highest ts_rank_cd first.
+    """
+    results = search_text(question.question, conn, question.edition, top_k)
+    return [result.heading_path for result in results]
+
+
+def main(mode: str = "vector") -> None:
+    """Scores retrieval over the answerable golden set and logs it to MLflow."""
     answerable = [q for q in load_golden_set(GOLDEN_SET_PATH) if q.answerable]
-    embedder = Embedder()
     conn = connect()
 
-    retrieved = [retrieved_paths_for(q, embedder, conn, TOP_K) for q in answerable]
+    if mode == "vector":
+        embedder = Embedder()
+        retrieved = [retrieved_paths_for(q, embedder, conn, TOP_K) for q in answerable]
+    elif mode == "fulltext":
+        retrieved = [retrieved_paths_for_text(q, conn, TOP_K) for q in answerable]
+    else:
+        print(f"unknown mode: {mode!r} (expected 'vector' or 'fulltext')")
+        sys.exit(1)
+
     metrics = evaluate(answerable, retrieved, TOP_K)
 
     config = RunConfig(
@@ -82,14 +114,15 @@ def main() -> None:
         overlap=OVERLAP,
         embedding_model=DEFAULT_MODEL,
         top_k=TOP_K,
-        retrieval_mode="vector",
+        retrieval_mode=mode,
     )
     log_run(config, metrics, EXPERIMENT)
 
-    print(f"scored {len(answerable)} answerable questions")
+    print(f"scored {len(answerable)} answerable questions (mode={mode})")
     for name, value in metrics.items():
         print(f"  {name}: {value:.3f}")
 
 
 if __name__ == "__main__":
-    main()
+    mode = sys.argv[1] if len(sys.argv) > 1 else "vector"
+    main(mode)
