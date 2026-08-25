@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
 
 _PROMPT_TEMPLATE = (
-    Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "answer_v1.md"
+    Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "answer_v2.md"
 ).read_text()
 
 
