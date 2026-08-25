@@ -19,6 +19,18 @@ _JUDGE_PROMPT = (
 ).read_text()
 
 
+def _strip_to_json(raw: str) -> str:
+    """Extract the JSON object from an LLM reply, tolerating code fences or stray prose.
+
+    Args:
+        raw: the model's reply, possibly wrapped in ```json fences or surrounding text.
+
+    Returns:
+        The substring from the first "{" to the last "}", ready for json.loads.
+    """
+    return raw[raw.index("{") : raw.rindex("}") + 1]
+
+
 class Judge:
     """LLM-as-judge for generation evals. The model is pinned for reproducible scores."""
 
@@ -53,7 +65,7 @@ class Judge:
             if block.type == "text":
                 raw += block.text
 
-        claims: list[dict[str, str | bool]] = json.loads(raw)["claims"]
+        claims: list[dict[str, str | bool]] = json.loads(_strip_to_json(raw))["claims"]
         return claims
 
 
