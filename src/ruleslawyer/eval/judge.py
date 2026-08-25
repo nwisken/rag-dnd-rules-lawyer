@@ -1,4 +1,4 @@
-"""Generation evals: LLM-as-judge scoring of answer faithfulness.
+"""Generation evals: LLM-as-judge scoring of answer faithfulness and refusal behaviour.
 
 Functional core (the pure scorers) / imperative shell (the Judge's LLM call).
 """
@@ -14,9 +14,9 @@ from ruleslawyer.retrieval.search import SearchResult
 # pinned snapshot, not the floating alias — the judge is a fixed measuring stick
 JUDGE_MODEL = "claude-haiku-4-5-20251001"
 
-_JUDGE_PROMPT = (
-    Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "judge_faithfulness_v1.md"
-).read_text()
+_PROMPTS = Path(__file__).resolve().parent.parent.parent.parent / "prompts"
+_JUDGE_PROMPT = (_PROMPTS / "judge_faithfulness_v1.md").read_text()
+_REFUSAL_PROMPT = (_PROMPTS / "judge_refusal_v1.md").read_text()
 
 
 def _strip_to_json(raw: str) -> str:
@@ -68,6 +68,31 @@ class Judge:
         claims: list[dict[str, str | bool]] = json.loads(_strip_to_json(raw))["claims"]
         return claims
 
+    def is_refusal(self, question: str, answer: str) -> bool:
+        """Classify whether an answer declined rather than attempting a rules answer.
+
+        Args:
+            question: the user's question.
+            answer: the generated answer to classify.
+
+        Returns:
+            True if the answer refused, False if it attempted an answer (even a wrong one).
+        """
+        prompt = _REFUSAL_PROMPT.format(question=question, answer=answer)
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        raw = ""
+        for block in response.content:
+            if block.type == "text":
+                raw += block.text
+
+        refused: bool = json.loads(_strip_to_json(raw))["refused"]
+        return refused
+
 
 def faithfulness_score(claims: list[dict[str, str | bool]]) -> float:
     """Fraction of the judge's claims that were marked supported.
@@ -88,3 +113,22 @@ def faithfulness_score(claims: list[dict[str, str | bool]]) -> float:
         )
 
     return sum(True for claim in claims if claim["supported"]) / len(claims)
+
+
+def refusal_accuracy(refusals: list[bool]) -> float:
+    """Fraction of unanswerable questions the app correctly refused.
+
+    Args:
+        refusals: one bool per unanswerable question — True if the app declined.
+
+    Returns:
+        correct refusals / total, 0.0 to 1.0.
+
+    Raises:
+        ValueError: if refusals is empty, i.e no unanswerable questions were scored.
+    """
+
+    if not refusals:
+        raise ValueError("refusal_accuracy needs at least one unanswerable question")
+
+    return sum(refusals) / len(refusals)

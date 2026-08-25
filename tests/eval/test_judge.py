@@ -2,7 +2,7 @@
 
 import pytest
 
-from ruleslawyer.eval.judge import _strip_to_json, faithfulness_score
+from ruleslawyer.eval.judge import _strip_to_json, faithfulness_score, refusal_accuracy
 
 
 def test_faithfulness_all_supported() -> None:
@@ -27,6 +27,22 @@ def test_faithfulness_empty_raises() -> None:
     """checks a refusal (zero claims) is rejected rather than scored."""
     with pytest.raises(ValueError):
         faithfulness_score([])
+
+
+def test_refusal_accuracy_all_refused() -> None:
+    """checks every question correctly refused scores 1.0."""
+    assert refusal_accuracy([True, True, True]) == 1.0
+
+
+def test_refusal_accuracy_is_fractional() -> None:
+    """checks the score is correct refusals / total."""
+    assert refusal_accuracy([True, False, False, False]) == 0.25
+
+
+def test_refusal_accuracy_empty_raises() -> None:
+    """checks scoring with no unanswerable questions is rejected."""
+    with pytest.raises(ValueError):
+        refusal_accuracy([])
 
 
 def test_strip_to_json_plain() -> None:
