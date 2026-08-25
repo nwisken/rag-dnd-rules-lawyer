@@ -10,10 +10,22 @@ network produces from a piece of text. The geometry encodes meaning: texts with
 similar meaning map to nearby points, even with no shared words. Retrieval becomes
 "find the nearest vectors."
 
-**Embedding model** — The network that produces embeddings. Ours is
-`bge-small-en-v1.5` (384 dimensions). The dimension count is a property of the model,
-not a knob: changing models means re-embedding the whole corpus *and* altering the
-`vector(384)` column.
+**Embedding model** — The network that produces embeddings. Two models evaluated in
+this project: `bge-small-en-v1.5` (384 dims, 512-token window) and
+`all-MiniLM-L6-v2` (384 dims, 256-token window). The dimension count is a property
+of the model, not a knob: changing to a model with a different dimension means
+re-embedding the whole corpus *and* altering the `vector(N)` column. Even same-
+dimension models produce incomparable coordinate spaces — comparing vectors from two
+models computes fine and means nothing (silent wrongness, worse than a crash). 🚩
+
+**Context window (embedding)** — The maximum number of tokens an embedding model
+accepts. Text beyond this limit is silently truncated — the tail is lost from the
+vector with no error. This creates a hard coupling between chunk size and model
+choice: 400-token chunks exceed MiniLM's 256-token window, losing content. The
+chunking experiments showed this concretely: MiniLM at 200 tokens (fits the window)
+tied bge-small's best recall and posted the highest MRR; MiniLM at 400 tokens
+(truncated) dropped recall. Rule: chunk size must respect the embedding model's
+context window, or retrieval quality degrades invisibly. 🚩
 
 **Token / tokenizer** 🚩 — Embedding models don't read words or characters; they read
 *tokens*: pieces from a fixed vocabulary the model learned, often whole common words
