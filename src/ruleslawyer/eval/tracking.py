@@ -21,6 +21,20 @@ class RunConfig:
     retrieval_mode: str
 
 
+@dataclass(frozen=True, slots=True)
+class GenerationRunConfig:
+    """The settings that define one generation-eval run.
+
+    The judge prompts are versioned files in prompts/, so the git SHA (logged with
+    every run) already pins their exact text — no need to log them as params.
+    """
+
+    answer_model: str
+    answer_prompt: str
+    judge_model: str
+    top_k: int
+
+
 def config_to_params(config: RunConfig, git_sha: str) -> dict[str, str]:
     """Converts a RunConfig object to a dict of parameters.
 
@@ -37,6 +51,25 @@ def config_to_params(config: RunConfig, git_sha: str) -> dict[str, str]:
         "embedding_model": config.embedding_model,
         "top_k": str(config.top_k),
         "retrieval_mode": config.retrieval_mode,
+        "git_sha": git_sha,
+    }
+
+
+def generation_config_to_params(config: GenerationRunConfig, git_sha: str) -> dict[str, str]:
+    """Converts a GenerationRunConfig to a dict of MLflow parameters.
+
+    Args:
+        config: the generation-eval settings for this run.
+        git_sha: the commit the run was evaluated at.
+
+    Returns:
+        The settings as strings, keyed by param name, ready for MLflow.
+    """
+    return {
+        "answer_model": config.answer_model,
+        "answer_prompt": config.answer_prompt,
+        "judge_model": config.judge_model,
+        "top_k": str(config.top_k),
         "git_sha": git_sha,
     }
 
@@ -59,6 +92,22 @@ def log_run(config: RunConfig, metrics: dict[str, float], experiment: str) -> No
     mlflow.set_experiment(experiment_name=experiment)
     with mlflow.start_run():
         mlflow.log_params(config_to_params(config, get_git_sha()))
+        mlflow.log_metrics(metrics)
+
+
+def log_generation_run(
+    config: GenerationRunConfig, metrics: dict[str, float], experiment: str
+) -> None:
+    """Logs one generation-eval run to MLflow.
+
+    Args:
+        config: the generation-eval settings for this run.
+        metrics: the faithfulness / relevance / refusal scores to log.
+        experiment: name of the experiment to log to.
+    """
+    mlflow.set_experiment(experiment_name=experiment)
+    with mlflow.start_run():
+        mlflow.log_params(generation_config_to_params(config, get_git_sha()))
         mlflow.log_metrics(metrics)
 
 
