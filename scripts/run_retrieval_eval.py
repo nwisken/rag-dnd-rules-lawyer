@@ -1,11 +1,12 @@
 """Scores retrieval over the answerable golden set and logs one MLflow run.
 
 Usage:
-    uv run python scripts/run_retrieval_eval.py           # vector (default)
-    uv run python scripts/run_retrieval_eval.py fulltext  # keyword only
-    uv run python scripts/run_retrieval_eval.py hybrid    # RRF fusion
+    uv run python scripts/run_retrieval_eval.py vector
+    uv run python scripts/run_retrieval_eval.py hybrid --chunk-size 200 --overlap 25
+    uv run python scripts/run_retrieval_eval.py hybrid --model all-MiniLM-L6-v2
 """
 
+import argparse
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,10 +22,8 @@ from ruleslawyer.retrieval.fusion import reciprocal_rank_fusion
 from ruleslawyer.retrieval.search import search_text, search_vectors
 
 GOLDEN_SET_PATH = Path("evals/golden_set.jsonl")
-EXPERIMENT = "retrieval-baseline"
+DEFAULT_EXPERIMENT = "retrieval-baseline"
 TOP_K = 5
-CHUNK_SIZE = 400
-OVERLAP = 50
 
 
 def mean(values: list[float]) -> float:
@@ -117,39 +116,55 @@ def retrieved_paths_for_hybrid(
     return reciprocal_rank_fusion(vector_paths, text_paths)[:top_k]
 
 
-def main(mode: str = "vector") -> None:
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Score retrieval and log to MLflow.")
+    parser.add_argument("mode", nargs="?", default="vector",
+                        choices=["vector", "fulltext", "hybrid"],
+                        help="retrieval mode (default: vector)")
+    parser.add_argument("--chunk-size", type=int, default=400,
+                        help="chunk size used during ingestion (default: 400)")
+    parser.add_argument("--overlap", type=int, default=50,
+                        help="overlap used during ingestion (default: 50)")
+    parser.add_argument("--model", type=str, default=DEFAULT_MODEL,
+                        help=f"embedding model used during ingestion (default: {DEFAULT_MODEL})")
+    parser.add_argument("--experiment", type=str, default=DEFAULT_EXPERIMENT,
+                        help=f"MLflow experiment name (default: {DEFAULT_EXPERIMENT})")
+    return parser.parse_args()
+
+
+def main() -> None:
     """Scores retrieval over the answerable golden set and logs it to MLflow."""
+    args = parse_args()
     answerable = [q for q in load_golden_set(GOLDEN_SET_PATH) if q.answerable]
     conn = connect()
 
-    if mode == "vector":
-        embedder = Embedder()
+    if args.mode == "vector":
+        embedder = Embedder(model_name=args.model)
         retrieved = [retrieved_paths_for(q, embedder, conn, TOP_K) for q in answerable]
-    elif mode == "fulltext":
+    elif args.mode == "fulltext":
         retrieved = [retrieved_paths_for_text(q, conn, TOP_K) for q in answerable]
-    elif mode == "hybrid":
-        embedder = Embedder()
+    elif args.mode == "hybrid":
+        embedder = Embedder(model_name=args.model)
         retrieved = [retrieved_paths_for_hybrid(q, embedder, conn, TOP_K) for q in answerable]
     else:
-        print(f"unknown mode: {mode!r} (expected 'vector', 'fulltext', or 'hybrid')")
+        print(f"unknown mode: {args.mode!r}")
         sys.exit(1)
 
     metrics = evaluate(answerable, retrieved, TOP_K)
 
     config = RunConfig(
-        chunk_size=CHUNK_SIZE,
-        overlap=OVERLAP,
-        embedding_model=DEFAULT_MODEL,
+        chunk_size=args.chunk_size,
+        overlap=args.overlap,
+        embedding_model=args.model,
         top_k=TOP_K,
-        retrieval_mode=mode,
+        retrieval_mode=args.mode,
     )
-    log_run(config, metrics, EXPERIMENT)
+    log_run(config, metrics, args.experiment)
 
-    print(f"scored {len(answerable)} answerable questions (mode={mode})")
+    print(f"scored {len(answerable)} answerable questions (mode={args.mode})")
     for name, value in metrics.items():
         print(f"  {name}: {value:.3f}")
 
 
 if __name__ == "__main__":
-    mode = sys.argv[1] if len(sys.argv) > 1 else "vector"
-    main(mode)
+    main()
