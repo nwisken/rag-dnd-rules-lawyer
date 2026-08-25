@@ -17,6 +17,7 @@ JUDGE_MODEL = "claude-haiku-4-5-20251001"
 _PROMPTS = Path(__file__).resolve().parent.parent.parent.parent / "prompts"
 _JUDGE_PROMPT = (_PROMPTS / "judge_faithfulness_v1.md").read_text()
 _REFUSAL_PROMPT = (_PROMPTS / "judge_refusal_v1.md").read_text()
+_RELEVANCE_PROMPT = (_PROMPTS / "judge_relevance_v1.md").read_text()
 
 
 def _strip_to_json(raw: str) -> str:
@@ -93,6 +94,31 @@ class Judge:
         refused: bool = json.loads(_strip_to_json(raw))["refused"]
         return refused
 
+    def relevance_label(self, question: str, answer: str) -> str:
+        """Classify how well an answer addresses the question, as a rubric label.
+
+        Args:
+            question: the user's question.
+            answer: the generated answer to classify.
+
+        Returns:
+            the rubric label "full", "partial", or "none".
+        """
+        prompt = _RELEVANCE_PROMPT.format(question=question, answer=answer)
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        raw = ""
+        for block in response.content:
+            if block.type == "text":
+                raw += block.text
+
+        label: str = json.loads(_strip_to_json(raw))["relevance"]
+        return label
+
 
 def faithfulness_score(claims: list[dict[str, str | bool]]) -> float:
     """Fraction of the judge's claims that were marked supported.
@@ -132,3 +158,24 @@ def refusal_accuracy(refusals: list[bool]) -> float:
         raise ValueError("refusal_accuracy needs at least one unanswerable question")
 
     return sum(refusals) / len(refusals)
+
+
+_RELEVANCE_SCORES = {"full": 1.0, "partial": 0.5, "none": 0.0}
+
+
+def relevance_score(label: str) -> float:
+    """Map a relevance rubric label to a number.
+
+    Args:
+        label: the judge's rubric label — "full", "partial", or "none".
+
+    Returns:
+        1.0 for "full", 0.5 for "partial", 0.0 for "none".
+
+    Raises:
+        ValueError: if label is not one of the three known rubric labels.
+    """
+    if label not in _RELEVANCE_SCORES:
+        raise ValueError(f"unknown relevance label: {label!r}")
+
+    return _RELEVANCE_SCORES[label]

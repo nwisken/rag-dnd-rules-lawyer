@@ -217,6 +217,25 @@ right fact never appeared in the retrieved chunks. Noisy run-to-run: judges spli
 claims differently and waver on borderline inferences, so scores jitter a few
 points — which is why the CI gate has a tolerance. 🚩
 
+**Answer relevance** — Generation metric: does the answer actually address the
+question that was asked? Independent of faithfulness — an answer can be faithful to its
+sources yet answer a different question, or be on-topic yet unsupported. This project
+measures it with an LLM-as-judge **rubric**: the judge classifies the answer as `full` /
+`partial` / `none`, mapped to 1.0 / 0.5 / 0.0 and averaged over the answerable golden
+questions. A wrong refusal on an answerable question scores `none`, so the metric also
+penalises over-refusal. Correctness is deliberately out of scope — a confidently wrong
+but on-topic answer is still relevant; faithfulness is the metric that catches wrongness.
+🚩
+
+**Answer relevance via reverse-generation (RAGAS's method)** — The notable alternative
+to the rubric judge, worth being able to describe. Instead of rating relevance directly,
+generate N hypothetical questions *from the answer*, embed them, and take the mean cosine
+similarity to the real question's embedding; high similarity ⇒ the answer is "about" the
+same question. Clever because it needs no ground-truth answer, but it adds moving parts
+(reverse-generation + an embedding model + cosine) and can be gamed by generic answers
+that sit near everything. This project ships the rubric judge instead — simpler, one
+call, and a pure label→number mapping that unit-tests without an LLM. 🚩
+
 **Eval gate (tolerance + floor)** — The CI rule deciding whether a PR's eval scores
 pass. Two checks, both must hold: **tolerance** — the score may not drop more than
 0.05 below the tracked baseline (the best previous MLflow run); catches

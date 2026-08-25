@@ -2,7 +2,12 @@
 
 import pytest
 
-from ruleslawyer.eval.judge import _strip_to_json, faithfulness_score, refusal_accuracy
+from ruleslawyer.eval.judge import (
+    _strip_to_json,
+    faithfulness_score,
+    refusal_accuracy,
+    relevance_score,
+)
 
 
 def test_faithfulness_all_supported() -> None:
@@ -43,6 +48,21 @@ def test_refusal_accuracy_empty_raises() -> None:
     """checks scoring with no unanswerable questions is rejected."""
     with pytest.raises(ValueError):
         refusal_accuracy([])
+
+
+def test_relevance_score_maps_labels() -> None:
+    """checks each rubric label maps to its number."""
+    assert (relevance_score("full"), relevance_score("partial"), relevance_score("none")) == (
+        1.0,
+        0.5,
+        0.0,
+    )
+
+
+def test_relevance_score_unknown_label_raises() -> None:
+    """checks an unexpected label is rejected rather than silently scored."""
+    with pytest.raises(ValueError):
+        relevance_score("mostly")
 
 
 def test_strip_to_json_plain() -> None:
