@@ -206,6 +206,15 @@ near-identical chunks (which overlap-heavy chunking can cause) crowding out the 
 other section the answer needs. A Phase 5 candidate here, not something we currently
 run. 🚩
 
+**LLM-as-judge** — Using an LLM to score another LLM's output against a rubric, when the
+quality you care about ("is this grounded?", "does this address the question?") is too
+fuzzy for a string match. This project hand-rolls one for all three generation metrics:
+each is a *versioned prompt* + a `Judge` method that calls a **pinned** model + a *pure
+scorer* that turns the verdict into a number. Strengths: captures nuance no regex can, and
+needs no ground-truth answer. Weaknesses: noisy (the judge wavers run-to-run, hence the CI
+tolerance), costs an API call per item, and inherits the judge model's blind spots — so the
+judge is pinned and its prompt versioned for reproducibility. 🚩
+
 **Faithfulness** — Generation metric: is every claim in the answer actually
 supported by the retrieved chunks? Guards against the model answering from its own
 training data instead of the sources. Computed by a two-step LLM-as-judge pipeline
@@ -235,6 +244,28 @@ same question. Clever because it needs no ground-truth answer, but it adds movin
 (reverse-generation + an embedding model + cosine) and can be gamed by generic answers
 that sit near everything. This project ships the rubric judge instead — simpler, one
 call, and a pure label→number mapping that unit-tests without an LLM. 🚩
+
+**Refusal accuracy** — Generation metric over the *deliberately unanswerable* golden
+questions: the fraction the app correctly declined ("the SRD doesn't cover this") instead
+of inventing an answer. The subtle part is what counts as a failure: **substituting a
+similarly named rule** — answering about the halfling Lucky *trait* when asked about the
+Lucky *feat* — is an attempt, not a refusal, and must score as wrong. A metric that let
+substitution pass would reward the exact behaviour the honest-refusal feature exists to
+prevent. Baseline here is 1.000 (all 5 refused). 🚩
+
+**Model pinning (snapshot vs alias)** — A reproducibility discipline. A floating **alias**
+like `claude-haiku-4-5` silently points at whatever the current version is; a dated
+**snapshot** like `claude-haiku-4-5-20251001` is frozen. This project pins the *judge* to a
+snapshot (a measuring stick that must not move) while leaving the *generator* on the alias
+(a hyperparameter we deliberately tune). Mixing them up means a model upgrade quietly shifts
+your eval scores with no code change. 🚩
+
+**Defensive output parsing** — The rule that you never trust an LLM to honour an output
+format from the prompt alone. Our judge was told "return ONLY JSON" and still wrapped it in
+a ```json code fence, which broke `json.loads` at character 0. The fix is code, not a
+sterner prompt: `_strip_to_json` takes the substring from the first `{` to the last `}`,
+surviving fences and stray prose — and because it's a pure function it unit-tests without an
+LLM. General lesson: parse model output like untrusted input. 🚩
 
 **Eval gate (tolerance + floor)** — The CI rule deciding whether a PR's eval scores
 pass. Two checks, both must hold: **tolerance** — the score may not drop more than
