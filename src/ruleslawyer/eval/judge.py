@@ -5,6 +5,7 @@ Functional core (the pure scorers) / imperative shell (the Judge's LLM call).
 
 import json
 from pathlib import Path
+from typing import Any
 
 import anthropic
 
@@ -40,6 +41,24 @@ class Judge:
         self.max_tokens = max_tokens
         self.client = anthropic.Anthropic(api_key=Settings().anthropic_api_key)
 
+    def _call_json(self, prompt: str) -> dict[str, Any]:
+        """Send one prompt to the judge and parse its JSON reply.
+
+        Args:
+            prompt: the fully formatted judge prompt.
+
+        Returns:
+            the parsed JSON object, tolerant of code fences or stray prose.
+        """
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = "".join(b.text for b in response.content if b.type == "text")
+        parsed: dict[str, Any] = json.loads(_strip_to_json(raw))
+        return parsed
+
     def faithfulness_claims(
         self, results: list[SearchResult], answer: str
     ) -> list[dict[str, str | bool]]:
@@ -55,18 +74,7 @@ class Judge:
 
         context = _format_context(results)
         prompt = _JUDGE_PROMPT.format(context=context, answer=answer)
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        raw = ""
-        for block in response.content:
-            if block.type == "text":
-                raw += block.text
-
-        claims: list[dict[str, str | bool]] = json.loads(_strip_to_json(raw))["claims"]
+        claims: list[dict[str, str | bool]] = self._call_json(prompt)["claims"]
         return claims
 
     def is_refusal(self, question: str, answer: str) -> bool:
@@ -80,18 +88,7 @@ class Judge:
             True if the answer refused, False if it attempted an answer (even a wrong one).
         """
         prompt = _REFUSAL_PROMPT.format(question=question, answer=answer)
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        raw = ""
-        for block in response.content:
-            if block.type == "text":
-                raw += block.text
-
-        refused: bool = json.loads(_strip_to_json(raw))["refused"]
+        refused: bool = self._call_json(prompt)["refused"]
         return refused
 
     def relevance_label(self, question: str, answer: str) -> str:
@@ -105,18 +102,7 @@ class Judge:
             the rubric label "full", "partial", or "none".
         """
         prompt = _RELEVANCE_PROMPT.format(question=question, answer=answer)
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        raw = ""
-        for block in response.content:
-            if block.type == "text":
-                raw += block.text
-
-        label: str = json.loads(_strip_to_json(raw))["relevance"]
+        label: str = self._call_json(prompt)["relevance"]
         return label
 
 
