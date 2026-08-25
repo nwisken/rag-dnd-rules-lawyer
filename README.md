@@ -7,9 +7,10 @@ the difference between the 2014 rules (SRD 5.1) and the revised 2024 rules (SRD 
 
 Most RAG demos are a LangChain tutorial with a different PDF. This project differs by:
 
-1. **Hybrid retrieval** (pgvector cosine + Postgres full-text, fused with RRF) — rules
-   text is jargon-dense ("opportunity attack", "bonus action"); keyword search
-   materially beats pure vector search here, and we prove it with numbers.
+1. **Hybrid retrieval** (pgvector cosine + Postgres full-text, fused with RRF) —
+   evaluated against pure vector and pure keyword baselines, with the finding that
+   vector search is near-ceiling on this corpus. The experiment is the point: we
+   prove the claim with numbers rather than assuming hybrid always wins.
 2. **Version-aware answers** via metadata filtering across two rule editions.
 3. **Evaluated, not vibes-checked**: a golden Q&A set, retrieval + generation metrics
    tracked in MLflow, and evals gating CI.
@@ -38,8 +39,40 @@ different part of the pipeline:
 
 ## Status
 
-🚧 Phase 1 (walking skeleton) in progress. Eval results table, screenshots, and the
-public URL land here as the phases complete.
+Phase 2 (retrieval quality) complete. Screenshots and public URL land in later phases.
+
+### Retrieval baselines (top-5, 20 answerable golden questions)
+
+| Mode | recall@5 | MRR |
+|---|---|---|
+| vector (bge-small-en-v1.5) | 0.892 | 0.821 |
+| full-text (ts_rank_cd) | 0.300 | 0.260 |
+| hybrid (RRF fusion) | 0.892 | 0.789 |
+
+Hybrid recall matches vector; MRR is slightly worse. Vector search is near-ceiling on
+this corpus, and keyword search is weak enough (AND-joining via `plainto_tsquery` means
+multi-word queries often return zero results) that fusing it in dilutes the top
+rankings rather than improving them.
+
+### Chunking experiments (2 chunk sizes x 2 embedding models x 2 retrieval modes)
+
+| Chunk size | Model | Mode | recall@5 | MRR |
+|---|---|---|---|---|
+| 400 | bge-small-en-v1.5 | vector | 0.892 | 0.821 |
+| 400 | bge-small-en-v1.5 | hybrid | 0.892 | 0.789 |
+| 200 | bge-small-en-v1.5 | vector | 0.825 | 0.800 |
+| 200 | bge-small-en-v1.5 | hybrid | 0.825 | 0.692 |
+| 400 | all-MiniLM-L6-v2 | vector | 0.867 | 0.850 |
+| 400 | all-MiniLM-L6-v2 | hybrid | 0.867 | 0.817 |
+| 200 | all-MiniLM-L6-v2 | vector | **0.892** | **0.883** |
+| 200 | all-MiniLM-L6-v2 | hybrid | 0.892 | 0.821 |
+
+Key finding: 200-token chunks with all-MiniLM-L6-v2 tied the best recall and posted the
+highest MRR (0.883). MiniLM's 256-token context window means 400-token chunks are
+silently truncated, losing content from the embedding. Smaller chunks that fit within
+the window avoid this. Conversely, bge-small-en-v1.5 (512-token window) benefits from
+the richer context in 400-token chunks — halving the chunk size drops its recall from
+0.892 to 0.825.
 
 ## Local setup
 
