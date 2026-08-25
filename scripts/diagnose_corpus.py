@@ -68,7 +68,7 @@ def has_fragment(shingle: tuple[str, ...]) -> bool:
 def main() -> None:
     """Run the verification, then sample and categorise unmatched shingles."""
     print("=== verification ===")
-    print("RESULT:", is_corpus_valid(PDF_PATH, MARKDOWN_PATH))
+    print("RESULT:", is_corpus_valid(PDF_PATH, MARKDOWN_PATH, "srd51"))
 
     pdf_text = extract_pdf_text(PDF_PATH)
     markdown_text = MARKDOWN_PATH.read_text(encoding="utf-8")

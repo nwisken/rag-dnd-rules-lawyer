@@ -35,7 +35,7 @@ def main() -> None:
     conn = connect()
 
     for pdf_path, markdown_path, edition in CORPORA:
-        if is_corpus_valid(pdf_path, markdown_path):
+        if is_corpus_valid(pdf_path, markdown_path, edition):
             print(f"Corpus: {markdown_path} is valid")
             markdown_text_raw = markdown_path.read_text()
             markdown_parsed = parse_markdown(markdown_text_raw)
