@@ -39,7 +39,9 @@ different part of the pipeline:
 
 ## Status
 
-Phase 2 (retrieval quality) complete. Screenshots and public URL land in later phases.
+Phase 3 (answer quality) complete: citation-forced prompting, refusal behaviour for
+non-SRD questions, generation evals, and a thumbs up/down feedback endpoint. Screenshots
+and public URL land in later phases.
 
 ### Retrieval baselines (top-5, 20 answerable golden questions)
 
@@ -73,6 +75,24 @@ silently truncated, losing content from the embedding. Smaller chunks that fit w
 the window avoid this. Conversely, bge-small-en-v1.5 (512-token window) benefits from
 the richer context in 400-token chunks — halving the chunk size drops its recall from
 0.892 to 0.825.
+
+### Generation quality (LLM-as-judge, 25 golden questions)
+
+| Metric | Score |
+|---|---|
+| Faithfulness | 0.914 |
+| Answer relevance | 0.925 |
+| Refusal accuracy | 1.000 |
+
+Measured by a hand-rolled LLM-as-judge (not RAGAS) over the golden set — 20 answerable
+questions for faithfulness and answer relevance, 5 non-SRD questions for refusal
+accuracy. **Faithfulness** = share of answer claims inferable from the retrieved chunks
+alone; **answer relevance** = a full/partial/none rubric mapped to 1/0.5/0; **refusal
+accuracy** = correct honest-refusal rate on non-SRD questions, where handing back a
+similarly named rule counts as a failed attempt, not a refusal. The judge is pinned to a
+model snapshot (`claude-haiku-4-5-20251001`) so the measuring stick can't drift between
+runs. Faithfulness doubles as a retrieval signal: a low score points at missing context,
+not a hallucinating model.
 
 ## Local setup
 
