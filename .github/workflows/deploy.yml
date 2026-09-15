@@ -18,6 +18,8 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # skip cleanly until the Azure vars/secrets from infra/DEPLOY.md are configured
+    if: ${{ vars.ACR_NAME != '' }}
     env:
       RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
       ACR_NAME: ${{ vars.ACR_NAME }}
