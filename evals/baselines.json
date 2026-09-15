@@ -1,0 +1,13 @@
+{
+  "_comment": "Tracked eval baselines for the CI gate. Bump deliberately in a PR (visible diff) when a change genuinely improves a metric; never lower silently. Measured on the pinned corpus at 400/50, bge-small.",
+  "tolerance": 0.05,
+  "retrieval": {
+    "hybrid": { "recall_at_k": 0.892, "mrr": 0.789 }
+  },
+  "generation": {
+    "faithfulness": 0.914,
+    "answer_relevance": 0.925,
+    "refusal_accuracy": 1.0,
+    "faithfulness_floor": 0.70
+  }
+}

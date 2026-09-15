@@ -10,6 +10,8 @@ Usage:
 """
 
 import argparse
+import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -24,9 +26,26 @@ from ruleslawyer.ingest.load import connect
 from ruleslawyer.retrieval.search import SearchResult, search_vectors
 
 GOLDEN_SET_PATH = Path("evals/golden_set.jsonl")
+BASELINES_PATH = Path("evals/baselines.json")
 DEFAULT_EXPERIMENT = "generation-baseline"
 ANSWER_PROMPT = "answer_v2"
 TOP_K = 5
+
+
+def check_gate(metrics: dict[str, float]) -> None:
+    """Fails the process if faithfulness dropped past max(floor, baseline - tolerance).
+
+    Args:
+        metrics: the just-computed generation metrics.
+    """
+    baselines = json.loads(BASELINES_PATH.read_text())
+    gen = baselines["generation"]
+    floor = max(gen["faithfulness_floor"], gen["faithfulness"] - baselines["tolerance"])
+    actual = metrics["faithfulness"]
+    if actual < floor:
+        print(f"GATE FAIL: faithfulness {actual:.3f} < floor {floor:.3f}")
+        sys.exit(1)
+    print(f"GATE PASS: faithfulness {actual:.3f} >= floor {floor:.3f}")
 
 
 def mean(values: list[float]) -> float:
@@ -54,7 +73,7 @@ def answer_for(
         The retrieved chunks and the generated answer text.
     """
     results = search_vectors(question.question, embedder, conn, question.edition, top_k)
-    answer = llm.generate(query=question.question, results=results)
+    answer = llm.generate(query=question.question, results=results).answer
     return results, answer
 
 
@@ -104,6 +123,9 @@ def main() -> None:
     for name, value in metrics.items():
         print(f"  {name}: {value:.3f}")
 
+    if args.gate:
+        check_gate(metrics)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Score generation quality and log to MLflow.")
@@ -112,6 +134,11 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=DEFAULT_EXPERIMENT,
         help=f"MLflow experiment name (default: {DEFAULT_EXPERIMENT})",
+    )
+    parser.add_argument(
+        "--gate",
+        action="store_true",
+        help="exit non-zero if faithfulness regressed past max(floor, baseline - tolerance)",
     )
     return parser.parse_args()
 

@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+
+# ---- builder: install only the ui dependency-group (streamlit + httpx, no torch) ----
+FROM python:3.12-slim AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /bin/uv
+
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_DOWNLOADS=never
+
+WORKDIR /app
+
+# --only-group installs the group's deps and NOT the project, so src/README stay out of context
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --only-group ui
+
+# ---- runtime: slim, non-root ----
+FROM python:3.12-slim AS runtime
+
+RUN useradd --create-home --uid 10001 appuser
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+COPY --from=builder /app/.venv /app/.venv
+# the UI is a standalone script — imports only streamlit/httpx, never the ruleslawyer package
+COPY src/ruleslawyer/ui/app.py ./app.py
+
+USER appuser
+EXPOSE 8501
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health').status==200 else 1)"]
+
+CMD ["streamlit", "run", "app.py", \
+     "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]

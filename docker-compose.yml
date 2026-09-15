@@ -16,5 +16,46 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      # talk to the db service, not localhost — compose resolves the service name on its network
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ruleslawyer}:${POSTGRES_PASSWORD:-ruleslawyer}@db:5432/${POSTGRES_DB:-ruleslawyer}
+      # required — fail fast with a clear message if it's not in .env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    environment:
+      # reach the api over the compose network; the UI reads this at startup
+      RULESLAWYER_API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      # api's own HEALTHCHECK is 200 only after the model loaded, so the UI waits for readiness
+      api:
+        condition: service_healthy
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.2
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflowdata:/mlflow
+
 volumes:
   pgdata:
+  mlflowdata:

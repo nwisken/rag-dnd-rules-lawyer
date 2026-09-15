@@ -1,12 +1,15 @@
 """Streamlit app for users to ask and get responses to their D&D questions."""
 
+import os
 from typing import Any
 
 import httpx
 import streamlit as st
 
-API_URL = "http://localhost:8000/ask"
-FEEDBACK_URL = "http://localhost:8000/feedback"
+# base URL of the FastAPI backend; overridable so compose/prod can point at the api service
+API_BASE_URL = os.environ.get("RULESLAWYER_API_URL", "http://localhost:8000").rstrip("/")
+API_URL = f"{API_BASE_URL}/ask"
+FEEDBACK_URL = f"{API_BASE_URL}/feedback"
 
 EDITIONS: dict[str, str | None] = {
     "2014 (SRD 5.1)": "srd51",

@@ -4,33 +4,70 @@ version = "0.1.0"
 description = "Rules Lawyer: a D&D 5e RAG assistant with hybrid retrieval, edition-aware answers, and evaluated retrieval quality."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
+# No always-on runtime deps: each deploy target installs only its dependency-group
+# (api / ui / ingest below), so the UI image never ships torch. Local dev + CI get
+# the whole union via the dev group, which includes all three.
+dependencies = []
+
+[dependency-groups]
+# Served API: FastAPI + pgvector retrieval + query embedding + the LLM client.
+api = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "psycopg[binary]>=3.2",
+    "pgvector>=0.5.0",
     "sentence-transformers>=3.0",
+    # direct dep so the CPU-only index in [tool.uv.sources] binds (it ignores transitive-only)
+    "torch>=2.2",
+    "pydantic-settings>=2.4",
+    "anthropic>=0.117.1",
+    # App Insights telemetry; only activates when APPLICATIONINSIGHTS_CONNECTION_STRING is set (prod)
+    "azure-monitor-opentelemetry>=1.6",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+]
+# UI is a thin HTTP client — no ruleslawyer package, no torch (~15x smaller image).
+ui = [
     "streamlit>=1.38",
     "httpx>=0.27",
-    "pydantic-settings>=2.4",
-    "pysbd>=0.3.4",
-    "pgvector>=0.5.0",
-    "nltk>=3.10.0",
-    "pypdf>=6.14.2",
-    "anthropic>=0.117.1",
     # Transitive dep of streamlit/starlette, pinned deliberately: on anyio 4.11+
     # Streamlit's static-file route raises anyio.NoEventLoopError and every asset
     # 500s, so the UI never loads. Revisit when Streamlit supports the newer anyio.
     "anyio<4.11",
 ]
-
-[dependency-groups]
+# One-time corpus load (scripts/ingest.py, verify_corpus.py) — not in the served images.
+ingest = [
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.5.0",
+    "sentence-transformers>=3.0",
+    "torch>=2.2",
+    "pydantic-settings>=2.4",
+    "pysbd>=0.3.4",
+    "nltk>=3.10.0",
+    "pypdf>=6.14.2",
+]
 dev = [
     "pytest>=8.3",
     "ruff>=0.6",
     "mypy>=1.11",
-    # experiment tracking only — the served app never opens a run, so it stays out of the image
+    # experiment tracking only — the served app never opens a run, so it stays out of the images
     "mlflow>=2.16",
+    # dev + CI need the full runtime union to lint, type-check and run the suite
+    { include-group = "api" },
+    { include-group = "ui" },
+    { include-group = "ingest" },
 ]
+
+[tool.uv]
+default-groups = ["dev"]
+
+# bge-small runs on CPU; pull the CPU-only torch wheel so the api image isn't ~6 GB of unused CUDA
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
 [build-system]
 requires = ["hatchling"]
@@ -65,6 +102,11 @@ packages = ["ruleslawyer"]
 # We keep strict everywhere else and treat NLTK & pysbd's surface as untyped at the boundary.
 [[tool.mypy.overrides]]
 module = ["pysbd.*", "nltk.*"]
+ignore_missing_imports = true
+
+# azure-monitor / opentelemetry ship partial or no stubs; treat them as untyped at the boundary
+[[tool.mypy.overrides]]
+module = ["azure.*", "opentelemetry.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

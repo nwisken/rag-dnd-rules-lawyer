@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,8 +23,31 @@ from ruleslawyer.retrieval.fusion import reciprocal_rank_fusion
 from ruleslawyer.retrieval.search import search_text, search_vectors
 
 GOLDEN_SET_PATH = Path("evals/golden_set.jsonl")
+BASELINES_PATH = Path("evals/baselines.json")
 DEFAULT_EXPERIMENT = "retrieval-baseline"
 TOP_K = 5
+
+
+def check_gate(mode: str, metrics: dict[str, float]) -> None:
+    """Fails the process if recall@k regressed past the tracked baseline (for CI).
+
+    Args:
+        mode: retrieval mode being gated; must have a baseline entry.
+        metrics: the just-computed metrics for this run.
+    """
+    baseline = json.loads(BASELINES_PATH.read_text())
+    if mode not in baseline["retrieval"]:
+        print(f"GATE FAIL: no baseline for mode {mode!r} in {BASELINES_PATH}")
+        sys.exit(1)
+    base_recall = baseline["retrieval"][mode]["recall_at_k"]
+    tolerance = baseline["tolerance"]
+    floor = base_recall - tolerance
+    actual = metrics["recall_at_k"]
+    if actual < floor:
+        print(f"GATE FAIL: recall_at_k {actual:.3f} < floor {floor:.3f} "
+              f"(baseline {base_recall} - tol {tolerance})")
+        sys.exit(1)
+    print(f"GATE PASS: recall_at_k {actual:.3f} >= floor {floor:.3f}")
 
 
 def mean(values: list[float]) -> float:
@@ -129,6 +153,8 @@ def parse_args() -> argparse.Namespace:
                         help=f"embedding model used during ingestion (default: {DEFAULT_MODEL})")
     parser.add_argument("--experiment", type=str, default=DEFAULT_EXPERIMENT,
                         help=f"MLflow experiment name (default: {DEFAULT_EXPERIMENT})")
+    parser.add_argument("--gate", action="store_true",
+                        help="exit non-zero if recall@k regressed past the tracked baseline (CI)")
     return parser.parse_args()
 
 
@@ -164,6 +190,9 @@ def main() -> None:
     print(f"scored {len(answerable)} answerable questions (mode={args.mode})")
     for name, value in metrics.items():
         print(f"  {name}: {value:.3f}")
+
+    if args.gate:
+        check_gate(args.mode, metrics)
 
 
 if __name__ == "__main__":

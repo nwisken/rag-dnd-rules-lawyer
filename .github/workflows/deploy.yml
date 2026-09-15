@@ -1,0 +1,59 @@
+name: Deploy
+
+# On merge to main: build both images in ACR, then point the container apps at the new tag.
+# Auth is GitHub OIDC → Azure (federated credential), so no cloud keys are stored in the repo.
+on:
+  push:
+    branches: [main]
+
+# never let two deploys race the same apps
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # required for OIDC federated login
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      API_APP: ${{ vars.API_APP_NAME }}
+      UI_APP: ${{ vars.UI_APP_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure containerapp extension
+        run: az config set extension.use_dynamic_install=yes_without_prompt
+
+      # server-side builds (ACR Tasks) — no docker/buildx needed on the runner
+      - name: Build API image in ACR
+        run: az acr build -r "$ACR_NAME" -t "ruleslawyer-api:${{ github.sha }}" -f Dockerfile.api .
+
+      - name: Build UI image in ACR
+        run: az acr build -r "$ACR_NAME" -t "ruleslawyer-ui:${{ github.sha }}" -f Dockerfile.ui .
+
+      # configure managed-identity pull once (idempotent), then roll to the new immutable tag
+      - name: Deploy API
+        run: |
+          az containerapp registry set -n "$API_APP" -g "$RESOURCE_GROUP" \
+            --server "${ACR_NAME}.azurecr.io" --identity system
+          az containerapp update -n "$API_APP" -g "$RESOURCE_GROUP" \
+            --image "${ACR_NAME}.azurecr.io/ruleslawyer-api:${{ github.sha }}"
+
+      - name: Deploy UI
+        run: |
+          az containerapp registry set -n "$UI_APP" -g "$RESOURCE_GROUP" \
+            --server "${ACR_NAME}.azurecr.io" --identity system
+          az containerapp update -n "$UI_APP" -g "$RESOURCE_GROUP" \
+            --image "${ACR_NAME}.azurecr.io/ruleslawyer-ui:${{ github.sha }}"

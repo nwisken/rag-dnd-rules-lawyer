@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import anthropic
@@ -18,9 +20,12 @@ class Settings(BaseSettings):
     anthropic_api_key: str
 
 
-_PROMPT_TEMPLATE = (
-    Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "answer_v2.md"
-).read_text()
+# prompts live at repo root in dev; the served image copies them and sets RULESLAWYER_PROMPTS_DIR
+_PROMPTS_DIR = Path(
+    os.environ.get("RULESLAWYER_PROMPTS_DIR")
+    or Path(__file__).resolve().parents[3] / "prompts"
+)
+_PROMPT_TEMPLATE = (_PROMPTS_DIR / "answer_v2.md").read_text()
 
 
 def _format_context(results: list[SearchResult]) -> str:
@@ -33,6 +38,15 @@ def _format_context(results: list[SearchResult]) -> str:
             f"[{i}]\nEdition: {r.edition}\nSection: {r.heading_path}\nContent: {r.content}"
         )
     return "\n\n".join(blocks)
+
+
+@dataclass(frozen=True)
+class GenerationResult:
+    """A generated answer plus the token usage the query log records."""
+
+    answer: str
+    prompt_tokens: int
+    completion_tokens: int
 
 
 class LLMClient:
@@ -53,15 +67,15 @@ class LLMClient:
         self.max_tokens = max_tokens
         self.client = anthropic.Anthropic(api_key=Settings().anthropic_api_key)
 
-    def generate(self, query: str, results: list[SearchResult]) -> str:
-        """Send a query with retrieved context to the LLM and return the answer.
+    def generate(self, query: str, results: list[SearchResult]) -> GenerationResult:
+        """Send a query with retrieved context to the LLM and return the answer + usage.
 
         Args:
             query: the user's rules question.
             results: retrieved chunks from search.
 
         Returns:
-            the concatenated text from all response content blocks.
+            the concatenated answer text and the request's token usage.
         """
         system_prompt = _PROMPT_TEMPLATE.format(context=_format_context(results))
 
@@ -77,4 +91,8 @@ class LLMClient:
             if block.type == "text":
                 answer += block.text
 
-        return answer
+        return GenerationResult(
+            answer=answer,
+            prompt_tokens=response.usage.input_tokens,
+            completion_tokens=response.usage.output_tokens,
+        )

@@ -1,0 +1,43 @@
+# Keep the build context small, and keep secrets / data / local-only docs out of every image.
+
+# VCS + CI + local virtualenv
+.git
+.gitignore
+.github
+.venv
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local-only planning docs (also git-excluded); README.md is intentionally NOT here —
+# hatchling reads it when the API image builds the project.
+CLAUDE.md
+LEARNING_LOG.md
+
+# Corpus, models, experiment tracking — never baked into a served image
+data/
+mlruns/
+mlartifacts/
+mlflow.db
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Not needed at runtime in the served images
+tests/
+notebooks/
+scripts/
+evals/
+infra/
+db/
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
