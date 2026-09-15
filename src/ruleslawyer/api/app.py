@@ -3,9 +3,10 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from psycopg import Error as PsycopgError
 
-from ruleslawyer.api.models import AskRequest, AskResponse, Source
+from ruleslawyer.api.models import AskRequest, AskResponse, FeedbackRequest, Source
 from ruleslawyer.generation.llm import LLMClient
 from ruleslawyer.ingest.embed import Embedder
 from ruleslawyer.ingest.load import connect
@@ -56,3 +57,24 @@ def ask(body: AskRequest, request: Request) -> AskResponse:
     ]
 
     return AskResponse(answer=answer, sources=sources)
+
+
+@app.post("/feedback")
+def feedback(body: FeedbackRequest, request: Request) -> dict[str, str]:
+    # parameterized insert: values travel in a separate channel from the SQL text
+    insert_sql = (
+        "INSERT INTO feedback (question, answer, edition, verdict, retrieved_paths)"
+        " VALUES (%s, %s, %s, %s, %s)"
+    )
+    conn = request.app.state.conn
+    try:
+        conn.execute(
+            insert_sql,
+            (body.question, body.answer, body.edition, body.verdict, body.retrieved_paths),
+        )
+        conn.commit()
+    except PsycopgError as err:
+        # roll back so a rejected insert can't poison the shared connection
+        conn.rollback()
+        raise HTTPException(status_code=400, detail="Could not record feedback") from err
+    return {"status": "recorded"}

@@ -21,3 +21,11 @@ class Source(BaseModel):
 class AskResponse(BaseModel):
     answer: str
     sources: list[Source]
+
+
+class FeedbackRequest(BaseModel):
+    question: str
+    answer: str
+    edition: str | None = None
+    verdict: str
+    retrieved_paths: list[str] = []
